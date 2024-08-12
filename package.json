@@ -26,5 +26,10 @@
   "devDependencies": {
     "eslint": "^8",
     "eslint-config-next": "14.2.5"
-  }
+  },
+  "description": "Hey there. This is my project on an inventory management app!",
+  "main": "firebase.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
 }

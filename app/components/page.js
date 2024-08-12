@@ -18,7 +18,7 @@ export default function Home() {
     }
     return name.trim().toLowerCase();
   };
-
+  
   const [Pantry, setInventory] = useState([]);
   const [open, setOpen] = useState(false);
   const [itemName, setItemName] = useState('');
@@ -53,12 +53,15 @@ export default function Home() {
   };
 
   const removeItem = async (item) => {
+    const user = auth.currentUser;
+    if (!user) return;
+
     const normalizedItemName = normalizeName(item);
     const docRef = doc(collection(firestore, 'Pantry'), normalizedItemName);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
       const { quantity } = docSnap.data();
-      if (quantity === 1) {
+      if (quantity <= 1) {
         await deleteDoc(docRef);
       } else {
         await setDoc(docRef, { quantity: quantity - 1 });
@@ -206,7 +209,7 @@ export default function Home() {
         </Button>
         <TextField
           variant="outlined"
-          placeholder="Looking for something?.."
+          placeholder="Do you have...?"
           value={searchQuery}
           onChange={handleSearchChange}
         />

@@ -1,6 +1,6 @@
 'use client'
-import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
-import { firestore } from '@/firebase';
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword} from 'firebase/auth';
+import { firestore, auth} from '@/firebase';
 import React, { useState } from 'react';
 import { Box, Button, Modal, Typography, TextField, Stack } from '@mui/material';
 import { useRouter } from 'next/navigation';
@@ -22,40 +22,48 @@ const Homepage = () => {
       alert('All fields are required');
       return;
     }
-
+  
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailPattern.test(email)) {
       alert('Please enter a valid email address');
       return;
     }
-
+  
     if (password.length < 6) {
       alert('Password must be at least 6 characters long');
       return;
     }
+  
     try {
-        const usersCollection = collection(firestore, 'users');
-        const q = query(usersCollection, where('email', '==', email));
-        const querySnapshot = await getDocs(q);
-
-        if (!querySnapshot.empty) {
-            alert('This account already exists! Please use another email.');
-            return;
-        }
-        await createUserWithEmailAndPassword(auth, email, password);
-
-        // Add additional user data to Firestore if needed
-        await addDoc(usersCollection, {
-            name,
-            email,
-            password, // Consider encrypting the password before storing it in Firestore
-        });
-
-        alert('Sign up successful!');
-        router.push('./components'); 
+      // Create user with Firebase Authentication
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      
+      // Add additional user data to Firestore in a unique collection for each user
+      //const userCollection = collection(firestore, `Pantry_${user.uid}`);
+      //await addDoc(userCollection, {
+      //  name,
+      //  email,
+      //});
+      const userCollection = collection(firestore, `users/${user.uid}/Pantry`);
+  
+      alert('Sign up successful!');
+      router.push('./components'); 
     } catch (error) {
-        console.error('Error signing up:', error);
-        alert('Sign-up failed, please try again');
+      switch (error.code) {
+        case 'auth/email-already-in-use':
+          alert('This email is already in use.');
+          break;
+        case 'auth/invalid-email':
+          alert('The email address is not valid.');
+          break;
+        case 'auth/weak-password':
+          alert('The password is too weak.');
+          break;
+        default:
+          alert(`Sign-Up Error: ${error.message}`);
+          break;
+      }
     }
   };
 
@@ -64,21 +72,29 @@ const Homepage = () => {
       alert('Both email and password are required');
       return;
     }
-
+  
     try {
-      const usersCollection = collection(firestore, 'users');
-      const q = query(usersCollection, where('email', '==', email), where('password', '==', password));
-      const querySnapshot = await getDocs(q);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
 
-      if (querySnapshot.empty) {
-        alert('Invalid email or password');
-      } else {
-        alert('Login successful!');
-        router.push('./components');  
-      }
+      // Access user-specific collection
+      const userCollection = collection(firestore, `users/${user.uid}/Pantry`);
+      // Perform actions with userCollection
+
+      alert('Login successful!');
+      router.push('./components');  
     } catch (error) {
       console.error('Error logging in:', error);
       alert('Login failed, please try again');
+      }
+  };
+
+  const getUserItems = async () => {
+    const user = auth.currentUser;
+    if (user) {
+      const userCollection = collection(firestore, `Pantry_${user.uid}`);
+      const querySnapshot = await getDocs(userCollection);
+      // Handle retrieved items
     }
   };
   return (
