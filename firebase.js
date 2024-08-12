@@ -15,7 +15,6 @@ const firebaseConfig = {
 };
 
 let app;
-const db = getFirestore(app);
 let analytics;
 let firestore;
 let auth;
