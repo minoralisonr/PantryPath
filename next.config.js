@@ -5,9 +5,4 @@ const nextConfig = {
   },
 };
 
-const withMobileResponsiveImages = require('next-images/next-image-loader');
-
-module.exports = withMobileResponsiveImages({
-  esModule: true,
-  ...nextConfig, 
-});
+module.exports = nextConfig;
