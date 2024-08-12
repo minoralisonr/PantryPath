@@ -1,7 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   eslint: {
-      ignoreDuringBuilds: true,
+    ignoreDuringBuilds: true,
   },
 };
-module.exports = nextConfig;
+
+const withMobileResponsiveImages = require('next-images/next-image-loader');
+
+module.exports = withMobileResponsiveImages({
+  esModule: true,
+  ...nextConfig, 
+});
