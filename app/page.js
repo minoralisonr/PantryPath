@@ -1,250 +1,190 @@
-'use client';
-import React, { useState, useEffect } from 'react';
-import { Box, Button, Grid, IconButton, Modal, Stack, TextField, Typography } from '@mui/material';
-import AddShoppingCartIcon from '@mui/icons-material/AddShoppingCart';
-import AddCircleOutlineRoundedIcon from '@mui/icons-material/AddCircleOutlineRounded';
-import RemoveCircleOutlineRoundedIcon from '@mui/icons-material/RemoveCircleOutlineRounded';
-import DeleteIcon from '@mui/icons-material/Delete';
-import SearchIcon from '@mui/icons-material/Search';
-import { collection, deleteDoc, doc, getDoc, getDocs, setDoc, query, updateDoc, where } from 'firebase/firestore';
-import debounce from 'lodash/debounce';
+'use client'
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { firestore } from '@/firebase';
+import React, { useState } from 'react';
+import { Box, Button, Modal, Typography, TextField, Stack } from '@mui/material';
+import { useRouter } from 'next/navigation';
+import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
+import { AnimatedEmoji } from './AnimatedEmoji';
 
-export default function Home() {
-  const normalizeName = (name) => {
-    // Ensure name is a string and not undefined
-    if (typeof name !== 'string') {
-      return ''; // or handle as needed
-    }
-    return name.trim().toLowerCase();
-  };
-
-  const [Pantry, setInventory] = useState([]);
+const Homepage = () => {
   const [open, setOpen] = useState(false);
-  const [itemName, setItemName] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [itemQuantity, setItemQuantity] = useState('');
+  const [isLogin, setIsLogin] = useState(false);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const router = useRouter();
+  const [error, setError] = useState('');
+  const auth = getAuth();
 
-  const updateInventory = async () => {
-    const snapshot = await getDocs(collection(firestore, 'Pantry'));
-    const inventoryList = snapshot.docs.map(doc => ({
-      name: doc.id,
-      ...doc.data(),
-    }));
-    setInventory(inventoryList);
-  };
-
-  const addItem = async (item, quantityToAdd) => {
-    const normalizedItemName = normalizeName(item);
-    const docRef = doc(collection(firestore, 'Pantry'), normalizedItemName);
-    const docSnap = await getDoc(docRef);
-
-    if (docSnap.exists()) {
-      const currentData = docSnap.data();
-      const currentQuantity = Number(currentData.quantity) || 0;
-      const newQuantity = currentQuantity + Number(quantityToAdd);
-      await updateDoc(docRef, { quantity: newQuantity });
-    } else {
-      await setDoc(docRef, { quantity: quantityToAdd });
-    }
-    await updateInventory();
-  };
-
-  const removeItem = async (item) => {
-    const normalizedItemName = normalizeName(item);
-    const docRef = doc(collection(firestore, 'Pantry'), normalizedItemName);
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-      const { quantity } = docSnap.data();
-      if (quantity === 1) {
-        await deleteDoc(docRef);
-      } else {
-        await setDoc(docRef, { quantity: quantity - 1 });
-      }
-      await updateInventory();
-    }
-  };
-
-  const searchItem = async (searchTerm) => {
-    if (typeof searchTerm !== 'string' || searchTerm.trim() === '') {
-      setSearchResults([]);
-      setErrorMessage('');
+  const handleSignUp = async () => {
+    if (!name || !email || !password) {
+      alert('All fields are required');
       return;
     }
-    const normalizedSearchTerm = normalizeName(searchTerm);
-    const pantryRef = collection(firestore, 'Pantry');
-    const snapshot = await getDocs(pantryRef);
-    const allItems = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-    const filteredResults = allItems.filter(item =>
-      normalizeName(item.name).includes(normalizedSearchTerm)
-    );
 
-    if (filteredResults.some(item => normalizeName(item.name).includes(normalizedSearchTerm))) {
-      setErrorMessage('');
-      setSearchResults(filteredResults);
-    } else {
-      setSearchResults([]);
-      setTimeout(() => {
-        setErrorMessage('');
-      }, 1500);
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(email)) {
+      alert('Please enter a valid email address');
+      return;
+    }
+
+    if (password.length < 6) {
+      alert('Password must be at least 6 characters long');
+      return;
+    }
+    try {
+        const usersCollection = collection(firestore, 'users');
+        const q = query(usersCollection, where('email', '==', email));
+        const querySnapshot = await getDocs(q);
+
+        if (!querySnapshot.empty) {
+            alert('This account already exists! Please use another email.');
+            return;
+        }
+        await createUserWithEmailAndPassword(auth, email, password);
+
+        // Add additional user data to Firestore if needed
+        await addDoc(usersCollection, {
+            name,
+            email,
+            password, // Consider encrypting the password before storing it in Firestore
+        });
+
+        alert('Sign up successful!');
+        router.push('./main'); 
+    } catch (error) {
+        console.error('Error signing up:', error);
+        alert('Sign-up failed, please try again');
     }
   };
 
-  const debouncedSearch = debounce((term) => {
-    searchItem(term);
-  }, 300);
+  const handleLogin = async () => {
+    if (!email || !password) {
+      alert('Both email and password are required');
+      return;
+    }
 
-  const handleSearchChange = (e) => {
-    const value = e.target.value;
-    setSearchQuery(value);
-    debouncedSearch(value);
-  }
+    try {
+      const usersCollection = collection(firestore, 'users');
+      const q = query(usersCollection, where('email', '==', email), where('password', '==', password));
+      const querySnapshot = await getDocs(q);
 
-  useEffect(() => {
-    updateInventory();
-  }, []);
-
-  const filteredItems = searchQuery
-    ? Pantry.filter(item => item.name.toLowerCase().startsWith(searchQuery.toLowerCase()))
-    : Pantry;
-
+      if (querySnapshot.empty) {
+        alert('Invalid email or password');
+      } else {
+        alert('Login successful!');
+        router.push('./main');  
+      }
+    } catch (error) {
+      console.error('Error logging in:', error);
+      alert('Login failed, please try again');
+    }
+  };
   return (
     <Box
-      width="100vw"
-      height="100vh"
-      display={'flex'}
-      flexDirection={'column'}
-      justifyContent={'center'}
-      alignItems={'center'}
-      gap={2}
+    width="100vw"
+    height="100vh"
+    display="flex"
+    flexDirection="column"
+    justifyContent="center"
+    alignItems="center"
+    gap={2}
+    bgcolor="#abd1b5"
     >
-      <Modal open={open} onClose={() => setOpen(false)}>
-        <Box
-          position="absolute"
-          top="50%"
-          left="50%"
-          width={400}
-          bgcolor="#a0a899"
-          border="2px solid #f0f0f0"
-          boxShadow={24}
-          p={4}
-          display={'flex'}
-          flexDirection={'column'}
-          gap={3}
-          sx={{
-            transform: 'translate(-50%, -50%)',
-          }}
-        >
-          <Typography variant={'h5'}>Add Item</Typography>
-          <Stack width="100%" direction="row" spacing={2}>
-            <TextField
-              variant="outlined"
-              type='text'
-              placeholder='Enter item'
-              fullWidth
-              value={itemName}
-              onChange={(e) => setItemName(e.target.value)}
-            />
-            <TextField
-              variant="outlined"
-              fullWidth
-              type='text'
-              placeholder='Enter qty'
-              value={itemQuantity}
-              onChange={(e) => setItemQuantity(e.target.value)}
-            />
-            <Button
-              variant="outlined"
-              onClick={async () => {
-                await addItem(itemName, itemQuantity);
-                setItemName('');
-                setItemQuantity('');
-                setOpen(false);
-              }}
-            >
-              Add
-            </Button>
-          </Stack>
-        </Box>
-      </Modal>
-
-      <Stack direction="row" spacing={2}>
-        <Button
-          variant="contained"
-          startIcon={<AddShoppingCartIcon />}
-          onClick={() => setOpen(true)}
-        >
-          Add New Item
-        </Button>
-        <TextField
-          variant="outlined"
-          placeholder="Search item"
-          value={searchQuery}
-          onChange={handleSearchChange}
-        />
-      </Stack>
-
-      {errorMessage && <Typography color="error">{errorMessage}</Typography>}
-
-      <Box border="2px solid #f5e1e1">
+      <Box
+        padding={4}
+        bgcolor="#ffe9ec" 
+        border="2px solid"
+        borderColor="#f5e1e1"
+        boxShadow={3}
+        textAlign="center"
+        color="#759274" 
+      >
+        <Box border="2px solid #759274">
         <Box
           width="600px"
           height="100px"
-          bgcolor={'#759274'}
-          display={'flex'}
-          justifyContent={'center'}
-          alignItems={'center'}
+          bgcolor="#ffe9ec"
+          display="flex"
+          justifyContent="center"
+          alignItems="center"
         >
-          <Typography variant={'h3'} color={'#fff'} textAlign={'center'}>Inventory Tracker</Typography>
+        <Typography variant="h7" className = "ultra">
+        <h2>PantryPath App</h2>
+        Simplify your life by easily tracking and managing all your groceries and essentials!</Typography>
+        </Box><AnimatedEmoji/>
         </Box>
-        {(filteredItems.length > 0) && (
-        <Stack width="600px" height="450px" spacing={2} overflow="auto">
-          {filteredItems.map(({ id, name, quantity }) => (
-            <Box
-              key={id}
-              width="100%"
-              minHeight="100px"
-              display="flex"
-              justifyContent="space-between"
-              alignItems="center"
-              bgcolor="#ffe9ec"
-              padding={4}
-            >
-              <Grid container spacing={2}>
-                <Grid item xs={6}>
-                  <Typography variant="h5" color="#333" textAlign={'left'}>
-                    {name.charAt(0).toUpperCase() + name.slice(1).toLowerCase()}
-                  </Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="h5" color="#333" textAlign={'center'}>
-                    {quantity}
-                  </Typography>
-                </Grid>
-              </Grid>
-              <Stack direction="row" spacing={2}>
-                <IconButton
-                  aria-label="add"
-                  onClick={() => addItem(name, 1)}
-                >
-                  <AddCircleOutlineRoundedIcon />
-                </IconButton>
-                <IconButton
-                  aria-label="remove"
-                  onClick={() => removeItem(name)}
-                >
-                  <RemoveCircleOutlineRoundedIcon />
-                </IconButton>
-              </Stack>
-            </Box>
-          ))}
-        </Stack>)}
-      </Box>
-    </Box>
+        </Box>
+        <Button variant="contained" onClick={() => setOpen(true)}>
+          {isLogin ? 'Login' : 'Get Started'}
+        </Button>
+
+        <Modal open={open} onClose={() => setOpen(false)}>
+          <Box
+            position="absolute"
+            top="50%"
+            left="50%"
+            width={400}
+            bgcolor="#c4d9bc"
+            border="2px solid #ddd"
+            boxShadow={24}
+            p={4}
+            display="flex"
+            flexDirection="column"
+            gap={3}
+            sx={{ transform: 'translate(-50%, -50%)' }}
+          >
+            <Typography variant="h5">{isLogin ? 'Login' : 'Sign Up'}</Typography>
+            <Stack width="100%" spacing={2}>
+              {!isLogin && (
+                <TextField
+                  variant="outlined"
+                  label="Name"
+                  fullWidth
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              )}
+              <TextField
+                variant="outlined"
+                label="Email"
+                fullWidth
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+              <TextField
+                variant="outlined"
+                label="Password"
+                fullWidth
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <Button variant="contained" onClick={isLogin ? handleLogin : handleSignUp}>
+                {isLogin ? 'Login' : 'Sign Up'}
+              </Button>
+              <Button variant="text" onClick={() => setIsLogin(!isLogin)}>
+                {isLogin ? 'Don’t have an account? Sign Up' : 'Already have an account? Login'}
+              </Button>
+            </Stack>
+          </Box>
+        </Modal>
+        <Box
+        position="absolute"
+        bottom={0}
+        width="100%"
+        bgcolor="#abd1b5"
+        padding={1.25}
+        textAlign="center"
+      >
+        <Typography variant="body2" color="#f5e1e1" style={{ fontSize: '0.77rem'}}>
+          &copy; {new Date().getFullYear()} Hiarimino Ralison Rakotoson. All rights reserved.
+        </Typography></Box>
+  </Box>
+  
   );
-}
+};
+
+export default Homepage;

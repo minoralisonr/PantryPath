@@ -1,2 +1,2 @@
-Hi all! 🍉🍴
-This is my project for an inventory management App! 
+Hi guys!🧃🖋
+This is my project on an inventory management app!
