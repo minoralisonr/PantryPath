@@ -52,7 +52,7 @@ const Homepage = () => {
         });
 
         alert('Sign up successful!');
-        router.push('./main'); 
+        router.push('./components'); 
     } catch (error) {
         console.error('Error signing up:', error);
         alert('Sign-up failed, please try again');
@@ -74,7 +74,7 @@ const Homepage = () => {
         alert('Invalid email or password');
       } else {
         alert('Login successful!');
-        router.push('./main');  
+        router.push('./components');  
       }
     } catch (error) {
       console.error('Error logging in:', error);
